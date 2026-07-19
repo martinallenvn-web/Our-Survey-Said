@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Our Survey Said... - Classroom Game</title>
+<style>
+    :root {
+        --bg-dark: #000a20;
+        --bg-light: #001f5c;
+        --accent-gold: #ffcc00;
+        --accent-cyan: #00ffff;
+        --tile-bg: linear-gradient(to bottom, #0033cc, #001a66);
+        --font-main: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+    }
+    
+    * { box-sizing: border-box; }
+    
+    body {
+        margin: 0;
+        font-family: var(--font-main);
+        background: radial-gradient(circle at center, var(--bg-light), var(--bg-dark));
+        color: white;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 20px;
+        background: rgba(0,0,0,0.5);
+        border-bottom: 2px solid var(--accent-cyan);
+    }
+
+    .header-controls {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+    }
+
+    button, select, input {
+        font-family: var(--font-main);
+        padding: 8px 12px;
+        border-radius: 4px;
+        border: 1px solid var(--accent-cyan);
+        background: #001133;
+        color: white;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    
+    button:hover { background: #002266; }
+    .btn-gold { border-color: var(--accent-gold); color: var(--accent-gold); }
+    .btn-gold:hover { background: #332200; }
+    
+    .btn-strike { border-color: red; color: red; font-size: 1.2em; }
+    .btn-strike:hover { background: #330000; }
+
+    #app-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+        width: 100%;
+    }
+
+    /* GAME MODE STYLES */
+    .game-header {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .game-header h2 {
+        font-size: 2em;
+        margin: 0 0 10px 0;
+        text-transform: uppercase;
+        color: white;
+        text-shadow: 2px 2px 4px black;
+    }
+
+    .board {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        flex: 1;
+    }
+
+    .tile {
+        background: var(--tile-bg);
+        border: 3px solid var(--accent-cyan);
+        border-radius: 8px;
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+        display: flex;
+        align-items: stretch;
+        cursor: pointer;
+        overflow: hidden;
+        position: relative;
+        min-height: 80px;
+        transition: transform 0.1s;
+    }
+    .tile:active { transform: scale(0.98); }
+
+    .tile-hidden {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3em;
+        color: var(--accent-gold);
+        text-shadow: 0 0 15px var(--accent-gold);
+        font-weight: bold;
+    }
+
+    .tile-revealed {
+        flex: 1;
+        display: flex;
+    }
+
+    .tile-text {
+        flex: 1;
+        padding: 10px 20px;
+        font-size: 1.5em;
+        display: flex;
+        align-items: center;
+        text-transform: uppercase;
+        font-weight: bold;
+    }
+
+    .tile-points {
+        width: 100px;
+        background: #000;
+        border-left: 3px solid var(--accent-cyan);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2em;
+        color: var(--accent-cyan);
+        font-weight: bold;
+    }
+
+    .award-overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+    }
+    .tile:hover .award-overlay.active-overlay {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .award-overlay p { margin: 0 10px 0 0; font-size: 1.2em; }
+    
+    .team-btn {
+        background: var(--accent-gold);
+        color: black;
+        border: none;
+        font-size: 1.2em;
+        padding: 5px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .team-btn:hover { background: white; }
+    
+    .awarded-tag {
+        position: absolute;
+        bottom: 5px; right: 105px;
+        font-size: 0.8em;
+        color: var(--accent-gold);
+        background: rgba(0,0,0,0.7);
+        padding: 2px 8px;
+        border-radius: 4px;
+    }
+
+    /* SCOREBOARD */
+    .scoreboard {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-top: 30px;
+    }
+    .team-score {
+        background: rgba(0,0,0,0.6);
+        border: 2px solid var(--accent-gold);
+        border-radius: 8px;
+        padding: 10px 20px;
+        text-align: center;
+        min-width: 150px;
+    }
+    .team-name { font-size: 1.2em; color: var(--accent-gold); margin-bottom: 5px; text-transform: uppercase;}
+    .team-points { font-size: 2.5em; font-weight: bold; }
+    .score-adj { display: flex; justify-content: space-between; margin-top: 10px; }
+    .score-adj button { padding: 2px 10px; font-size: 1em; }
+
+    /* PREP MODE STYLES */
+    .prep-container {
+        background: rgba(0,0,0,0.6);
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #555;
+        overflow-y: auto;
+        max-height: 80vh;
+    }
+    .prep-round {
+        background: #001133;
+        padding: 15px;
+        margin-bottom: 20px;
+        border: 1px solid var(--accent-cyan);
+        border-radius: 8px;
+    }
+    .prep-round input[type="text"] { width: 100%; margin-bottom: 10px; font-size: 1.2em; }
+    .prep-answer-row { display: flex; gap: 10px; margin-bottom: 5px; }
+    .prep-answer-row input[type="text"] { flex: 1; margin: 0; font-size: 1em; }
+    .prep-answer-row input[type="number"] { width: 80px; font-size: 1em; }
+    
+    .strike-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5);
+        color: red;
+        font-size: 40vw;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-shadow: 0 0 50px darkred;
+        pointer-events: none;
+        opacity: 0;
+        z-index: 1000;
+        transition: opacity 0.1s;
+        font-family: sans-serif;
+        font-weight: bold;
+    }
+    .strike-active { opacity: 1; }
+
+</style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1 style="margin: 0; font-size: 1.5em; color: var(--accent-gold); text-shadow: 0 0 5px var(--accent-gold);">OUR SURVEY SAID...</h1>
+    </div>
+    <div class="header-controls">
+        <label>Teams: 
+            <select id="teamCountSelect" onchange="changeTeamCount(this.value)">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3" selected>3</option>
+                <option value="4">4</option>
+            </select>
+        </label>
+        <button class="btn-gold" id="modeToggleBtn" onclick="toggleMode()">Switch to Prep Mode</button>
+    </div>
+</header>
+
+<div id="app-container"></div>
+<div id="strikeOverlay" class="strike-overlay">X</div>
+
+<script>
+    // Initial State & Data
+    let state = {
+        mode: 'game',
+        teams: 3,
+        scores: [0, 0, 0, 0],
+        currentRound: 0,
+        boardState: Array(8).fill().map(() => ({ revealed: false, awardedTo: null }))
+    };
+
+    let rounds = [
+        {
+            question: "Name an animal that frequently appears in English idiomatic expressions.",
+            answers: [
+                { text: "Dog", points: 10 }, { text: "Cat", points: 8 },
+                { text: "Horse", points: 6 }, { text: "Bird", points: 5 },
+                { text: "Pig", points: 4 }, { text: "Bull", points: 3 },
+                { text: "Fish", points: 2 }, { text: "Lion", points: 1 }
+            ]
+        },
+        {
+            question: "Name a common phrasal verb that uses the word UP",
+            answers: [
+                { text: "Give up", points: 10 }, { text: "Wake up", points: 8 },
+                { text: "Get up", points: 6 }, { text: "Look up", points: 5 },
+                { text: "Grow up", points: 4 }, { text: "Make up", points: 3 },
+                { text: "Turn up", points: 2 }, { text: "Bring up", points: 1 }
+            ]
+        },
+        {
+            question: "Name something you might completely forget to pack for a holiday abroad.",
+            answers: [
+                { text: "Phone charger / cable", points: 10 }, { text: "Travel adaptor plug", points: 8 },
+                { text: "Toothbrush", points: 6 }, { text: "Sunscreen", points: 5 },
+                { text: "Sunglasses", points: 4 }, { text: "Swimwear", points: 3 },
+                { text: "Prescription medication", points: 2 }, { text: "Passport", points: 1 }
+            ]
+        },
+        {
+            question: "What are the biggest health and wellbeing issues facing UK teenagers?",
+            answers: [
+                { text: "Digital habits / Screen time (87%)", points: 10 },
+                { text: "Sleep deprivation (60%)", points: 8 },
+                { text: "Exercise / Physical inactivity (46%)", points: 6 },
+                { text: "Social relationships / Bullying (27%)", points: 5 },
+                { text: "Stress / Mental health (20%)", points: 4 },
+                { text: "Obesity / Diet / Junk food (19%)", points: 3 },
+                { text: "Eating disorders / Body image (12.5%)", points: 2 },
+                { text: "Problematic social media use (11%)", points: 1 }
+            ]
+        },
+        {
+            question: "Name a common 'work disaster' that could happen on your first day at a new office job.",
+            answers: [
+                { text: "Spilling coffee on equipment", points: 10 }, { text: "Forgetting the boss's name", points: 8 },
+                { text: "Arriving late", points: 6 }, { text: "Accidentally 'replying all'", points: 5 },
+                { text: "Breaking the printer", points: 4 }, { text: "Getting lost in the building", points: 3 },
+                { text: "Deleting an important file", points: 2 }, { text: "Setting off the fire alarm", points: 1 }
+            ]
+        },
+        {
+            question: "What is the biggest loss to a community when an urban green space is sold to developers?",
+            answers: [
+                { text: "Trees and nature", points: 10 }, { text: "A place to exercise", points: 8 },
+                { text: "A community gathering hub", points: 6 }, { text: "Local wildlife and birds", points: 5 },
+                { text: "Clean air", points: 4 }, { text: "Peace and quiet", points: 3 },
+                { text: "Safe play areas for children", points: 2 }, { text: "Shade during the summer", points: 1 }
+            ]
+        },
+        {
+            question: "Name a common regret people express about their teenage years.",
+            answers: [
+                { text: "Not studying harder", points: 10 }, { text: "Worrying about appearance", points: 8 },
+                { text: "Giving up a hobby/instrument", points: 6 }, { text: "Arguing with parents", points: 5 },
+                { text: "Not saving money", points: 4 }, { text: "Caring what others thought", points: 3 },
+                { text: "Following the wrong crowd", points: 2 }, { text: "Quitting sports", points: 1 }
+            ]
+        },
+        {
+            question: "Name a reason someone might decide to do a 'digital detox' and delete their apps.",
+            answers: [
+                { text: "Improve mental health", points: 10 }, { text: "Get better sleep", points: 8 },
+                { text: "Stop doomscrolling", points: 6 }, { text: "Spend more time with family", points: 5 },
+                { text: "Focus on work or studies", points: 4 }, { text: "Stop comparing themselves", points: 3 },
+                { text: "Reduce eye strain", points: 2 }, { text: "Reconnect with nature", points: 1 }
+            ]
+        },
+        {
+            question: "Name an annoying habit a flatmate might have.",
+            answers: [
+                { text: "Leaving dirty dishes in sink", points: 10 }, { text: "Playing loud music late", points: 8 },
+                { text: "Not taking out the rubbish", points: 6 }, { text: "Eating someone else's food", points: 5 },
+                { text: "Paying bills late", points: 4 }, { text: "Never buying toilet paper", points: 3 },
+                { text: "Leaving lights on", points: 2 }, { text: "Having noisy guests over", points: 1 }
+            ]
+        },
+        {
+            question: "Name a disaster that could happen when hosting a dinner party.",
+            answers: [
+                { text: "Burning the main course", points: 10 }, { text: "Forgetting a dietary allergy", points: 8 },
+                { text: "Running out of drinks", points: 6 }, { text: "Guests arriving far too early", points: 5 },
+                { text: "Dropping the food on the floor", points: 4 }, { text: "Undercooking the meat", points: 3 },
+                { text: "Awkward silences / arguments", points: 2 }, { text: "A sudden power cut", points: 1 }
+            ]
+        }
+    ];
+
+    function changeTeamCount(count) {
+        state.teams = parseInt(count);
+        render();
+    }
+
+    function toggleMode() {
+        state.mode = state.mode === 'game' ? 'prep' : 'game';
+        document.getElementById('modeToggleBtn').innerText = state.mode === 'game' ? 'Switch to Prep Mode' : 'Switch to Game Mode';
+        render();
+    }
+
+    function selectRound(index) {
+        state.currentRound = parseInt(index);
+        resetBoardState();
+        render();
+    }
+
+    function resetBoardState() {
+        state.boardState = Array(8).fill().map(() => ({ revealed: false, awardedTo: null }));
+    }
+
+    function triggerStrike() {
+        const overlay = document.getElementById('strikeOverlay');
+        overlay.classList.add('strike-active');
+        setTimeout(() => overlay.classList.remove('strike-active'), 1000);
+    }
+
+    function revealTile(index) {
+        if (!state.boardState[index].revealed) {
+            state.boardState[index].revealed = true;
+            render();
+        }
+    }
+
+    function awardPoints(tileIndex, teamIndex, points, e) {
+        e.stopPropagation(); // Prevent tile click
+        if (state.boardState[tileIndex].awardedTo === null) {
+            state.scores[teamIndex] += points;
+            state.boardState[tileIndex].awardedTo = teamIndex + 1;
+            render();
+        }
+    }
+
+    function manualScoreAdj(teamIndex, amount) {
+        state.scores[teamIndex] += amount;
+        render();
+    }
+
+    // --- PREP MODE FUNCTIONS ---
+    function updateRoundQuestion(rIndex, val) { rounds[rIndex].question = val; }
+    function updateAnswerText(rIndex, aIndex, val) { rounds[rIndex].answers[aIndex].text = val; }
+    function updateAnswerPoints(rIndex, aIndex, val) { rounds[rIndex].answers[aIndex].points = parseFloat(val) || 0; }
+    
+    function moveRoundUp(rIndex) {
+        if (rIndex > 0) {
+            const temp = rounds[rIndex];
+            rounds[rIndex] = rounds[rIndex - 1];
+            rounds[rIndex - 1] = temp;
+            render();
+        }
+    }
+    function moveRoundDown(rIndex) {
+        if (rIndex < rounds.length - 1) {
+            const temp = rounds[rIndex];
+            rounds[rIndex] = rounds[rIndex + 1];
+            rounds[rIndex + 1] = temp;
+            render();
+        }
+    }
+    function addRound() {
+        rounds.push({
+            question: "New Question",
+            answers: Array(8).fill().map(() => ({ text: "", points: 0 }))
+        });
+        render();
+    }
+    function deleteRound(rIndex) {
+        if(confirm("Are you sure you want to delete this round?")) {
+            rounds.splice(rIndex, 1);
+            if(state.currentRound >= rounds.length) state.currentRound = Math.max(0, rounds.length - 1);
+            render();
+        }
+    }
+
+    // --- RENDER ---
+    function render() {
+        const container = document.getElementById('app-container');
+        container.innerHTML = '';
+
+        if (state.mode === 'game') {
+            renderGameMode(container);
+        } else {
+            renderPrepMode(container);
+        }
+    }
+
+    function renderGameMode(container) {
+        const round = rounds[state.currentRound];
+        if(!round) return;
+
+        // Header controls for game mode
+        let controlsHTML = `
+            <div class="game-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <select onchange="selectRound(this.value)">
+                        ${rounds.map((r, i) => `<option value="${i}" ${i === state.currentRound ? 'selected' : ''}>Round ${i + 1}</option>`).join('')}
+                    </select>
+                    <button class="btn-strike" onclick="triggerStrike()">❌ STRIKE ❌</button>
+                </div>
+                <h2>${round.question}</h2>
+            </div>
+        `;
+        
+        // Board
+        let boardHTML = `<div class="board">`;
+        for (let i = 0; i < 8; i++) {
+            const ans = round.answers[i];
+            const isRevealed = state.boardState[i].revealed;
+            const awarded = state.boardState[i].awardedTo;
+            const isEmpty = !ans || !ans.text.trim();
+
+            if (isEmpty && !isRevealed) {
+                 boardHTML += `<div class="tile" style="visibility: hidden;"></div>`;
+                 continue;
+            }
+
+            if (!isRevealed) {
+                boardHTML += `
+                    <div class="tile" onclick="revealTile(${i})">
+                        <div class="tile-hidden">${i + 1}</div>
+                    </div>`;
+            } else {
+                let awardBtns = '';
+                if (!awarded) {
+                    awardBtns = `<div class="award-overlay active-overlay"><p>Award to:</p>`;
+                    for(let t=0; t<state.teams; t++){
+                        awardBtns += `<button class="team-btn" onclick="awardPoints(${i}, ${t}, ${ans.points}, event)">T${t+1}</button>`;
+                    }
+                    awardBtns += `</div>`;
+                }
+                
+                let awardedTag = awarded ? `<div class="awarded-tag">Points to T${awarded}</div>` : '';
+
+                boardHTML += `
+                    <div class="tile">
+                        <div class="tile-revealed">
+                            <div class="tile-text">${ans.text}</div>
+                            <div class="tile-points">${ans.points}</div>
+                        </div>
+                        ${awardBtns}
+                        ${awardedTag}
+                    </div>`;
+            }
+        }
+        boardHTML += `</div>`;
+
+        // Scoreboard
+        let scoreHTML = `<div class="scoreboard">`;
+        for(let i = 0; i < state.teams; i++) {
+            scoreHTML += `
+                <div class="team-score">
+                    <div class="team-name">Team ${i + 1}</div>
+                    <div class="team-points">${state.scores[i]}</div>
+                    <div class="score-adj">
+                        <button onclick="manualScoreAdj(${i}, -1)">-1</button>
+                        <button onclick="manualScoreAdj(${i}, 1)">+1</button>
+                    </div>
+                </div>`;
+        }
+        scoreHTML += `</div>`;
+
+        container.innerHTML = controlsHTML + boardHTML + scoreHTML;
+    }
+
+    function renderPrepMode(container) {
+        let html = `<div class="prep-container">
+            <h2>Preparation Dashboard</h2>
+            <p style="color:#aaa;">Edit your rounds below. Changes are saved instantly in your browser session. Switch back to Game Mode to play.</p>
+        `;
+
+        rounds.forEach((round, rIndex) => {
+            html += `
+                <div class="prep-round">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="margin: 0;">Round ${rIndex + 1}</h3>
+                        <div>
+                            <button onclick="moveRoundUp(${rIndex})">⬆️</button>
+                            <button onclick="moveRoundDown(${rIndex})">⬇️</button>
+                            <button onclick="deleteRound(${rIndex})" style="border-color: red; color: red;">Delete</button>
+                        </div>
+                    </div>
+                    <input type="text" value="${round.question.replace(/"/g, '&quot;')}" onchange="updateRoundQuestion(${rIndex}, this.value)" placeholder="Enter question here...">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            `;
+            
+            for(let i=0; i<8; i++){
+                let ans = round.answers[i] || { text: '', points: 0 };
+                html += `
+                    <div class="prep-answer-row">
+                        <span style="display:inline-block; width: 20px; line-height: 35px;">${i+1}.</span>
+                        <input type="text" value="${ans.text.replace(/"/g, '&quot;')}" onchange="updateAnswerText(${rIndex}, ${i}, this.value)" placeholder="Answer">
+                        <input type="number" step="any" value="${ans.points}" onchange="updateAnswerPoints(${rIndex}, ${i}, this.value)" placeholder="Pts">
+                    </div>
+                `;
+            }
+            html += `</div></div>`;
+        });
+
+        html += `<button class="btn-gold" onclick="addRound()" style="font-size: 1.2em; padding: 10px 20px;">+ Add New Round</button></div>`;
+        container.innerHTML = html;
+    }
+
+    // Init
+    render();
+</script>
+
+</body>
+</html>
