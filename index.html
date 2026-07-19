@@ -26,14 +26,13 @@
         flex-direction: column;
     }
 
-    /* Fixed location controls */
+    /* Fixed location controls (Inline styles added below for bulletproof positioning) */
     .footer-controls {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
         z-index: 2000;
         display: flex;
         gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
     }
 
     header {
@@ -80,8 +79,7 @@
     }
 
     .game-header { text-align: center; margin-bottom: 20px; }
-    .game-header h2 { font-size: 2em; margin: 0 0 5px 0; text-transform: uppercase; color: white; text-shadow: 2px 2px 4px black; }
-    .game-header h3 { color: var(--accent-cyan); margin: 0 0 15px 0; font-weight: normal; }
+    .game-header h2 { font-size: 2em; margin: 0 0 15px 0; text-transform: uppercase; color: white; text-shadow: 2px 2px 4px black; }
 
     .board { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; flex: 1; }
 
@@ -169,7 +167,7 @@
 
 <div id="app-container"></div>
 
-<div class="footer-controls">
+<div class="footer-controls" style="position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; gap: 10px;">
     <button id="setupToggleBtn" onclick="toggleSetup()" style="border-color: var(--accent-gold); color: var(--accent-gold); background: rgba(0,0,0,0.8);">⚙️ Setup / Answers</button>
     <button id="muteBtn" onclick="toggleMute()" style="border-color: #888; color: #ddd; background: rgba(0,0,0,0.7);">🔊 Mute</button>
     <button id="fsBtn" onclick="toggleFullScreen()" style="border-color: #888; color: #ddd; background: rgba(0,0,0,0.7);">⛶ Full Screen</button>
@@ -181,9 +179,23 @@
     © 2026 Martin Allen. All rights reserved. Free for classroom use; duplication or distribution of the source code is prohibited.
 </footer>
 
-<script>
-    const IS_SETUP = true; 
-    const EXPORTED_DATA = null; 
+<script id="game-data" type="application/json">
+{}
+</script>
+
+<script id="main-script">
+    const IS_SETUP = true; // EXPORT_FLAG
+    let EXPORTED_DATA = null; 
+
+    // Robust parsing of the injected game data to prevent download syntax crashes
+    try {
+        const dataElement = document.getElementById('game-data');
+        if (dataElement && dataElement.textContent.trim().length > 5) {
+            EXPORTED_DATA = JSON.parse(dataElement.textContent.trim());
+        }
+    } catch(e) {
+        console.error("Data parse error", e);
+    }
 
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     let isMuted = false;
@@ -441,15 +453,50 @@
     function exportGame() {
         syncSetupState();
         const dataObj = { title: gameTitle, subtitle: gameSubtitle, image: gameImage, rounds: rounds, teamNames: state.teamNames };
-        const dataStr = JSON.stringify(dataObj).replace(/</g, '\\u003c');
         
-        // We use outerHTML to cleanly wrap the entire current DOM
-        let htmlContent = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+        // Escape brackets safely for script tags to prevent XSS/Parser breaks
+        const dataStr = JSON.stringify(dataObj).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
         
-        // Using robust regex to swap the setup flags
-        htmlContent = htmlContent.replace(/const IS_SETUP\s*=\s*true;/, "const IS_SETUP = false;");
-        htmlContent = htmlContent.replace(/const EXPORTED_DATA\s*=\s*null;/, "const EXPORTED_DATA = " + dataStr + ";");
-
+        // Clean clone of the entire document to strip transient states
+        const clone = document.documentElement.cloneNode(true);
+        
+        const appCont = clone.querySelector('#app-container');
+        if (appCont) appCont.innerHTML = '';
+        
+        const hTitle = clone.querySelector('#header-title');
+        if (hTitle) hTitle.innerText = '';
+        
+        const mHeader = clone.querySelector('#main-header');
+        if (mHeader) mHeader.style.display = 'none';
+        
+        const sOverlay = clone.querySelector('#strikeOverlay');
+        if (sOverlay) sOverlay.classList.remove('strike-active');
+        
+        // Vigorously strip out empty text nodes in the body to eliminate rogue characters (\n\n)
+        const body = clone.querySelector('body');
+        if (body) {
+            Array.from(body.childNodes).forEach(node => {
+                if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() === '') {
+                    node.remove();
+                }
+            });
+        }
+        
+        // Inject the stringified data explicitly into a data island to prevent JS syntax crash
+        const dataScript = clone.querySelector('#game-data');
+        if (dataScript) {
+            dataScript.textContent = dataStr;
+        }
+        
+        // Flip the launch flag natively
+        const mainScript = clone.querySelector('#main-script');
+        if (mainScript) {
+            mainScript.textContent = mainScript.textContent.replace(/const IS_SETUP\s*=\s*(true|false);\s*\/\/\s*EXPORT_FLAG/, "const IS_SETUP = false; // EXPORT_FLAG");
+        }
+        
+        // Rebuild clean HTML
+        let htmlContent = "<!DOCTYPE html>\n" + clone.outerHTML;
+        
         const blob = new Blob([htmlContent], {type: "text/html;charset=utf-8"});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -580,7 +627,6 @@
         let controlsHTML = `
             <div class="game-header">
                 <h2>${round.question}</h2>
-                <h3>${gameSubtitle}</h3>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <select onchange="selectRound(this.value)">
                         ${rounds.map((r, i) => `<option value="${i}" ${i === state.currentRound ? 'selected' : ''}>Round ${i + 1}</option>`).join('')}
