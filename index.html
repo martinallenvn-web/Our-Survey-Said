@@ -26,7 +26,6 @@
         flex-direction: column;
     }
 
-    /* Fixed location controls (Inline styles added below for bulletproof positioning) */
     .footer-controls {
         z-index: 2000;
         display: flex;
@@ -50,7 +49,7 @@
         align-items: center;
     }
 
-    button, select, input {
+    button, select, input, textarea {
         font-family: var(--font-main);
         padding: 8px 12px;
         border-radius: 4px;
@@ -61,6 +60,12 @@
         font-weight: bold;
     }
     
+    textarea {
+        cursor: text;
+        font-weight: normal;
+        resize: vertical;
+    }
+
     button:hover { background: #002266; }
     .btn-gold { border-color: var(--accent-gold); color: var(--accent-gold); }
     .btn-gold:hover { background: #332200; }
@@ -187,7 +192,6 @@
     const IS_SETUP = true; // EXPORT_FLAG
     let EXPORTED_DATA = null; 
 
-    // Robust parsing of the injected game data to prevent download syntax crashes
     try {
         const dataElement = document.getElementById('game-data');
         if (dataElement && dataElement.textContent.trim().length > 5) {
@@ -293,21 +297,12 @@
     let previousMode = 'splash';
 
     let gameTitle = EXPORTED_DATA ? EXPORTED_DATA.title : "Our Survey Said...";
-    let gameSubtitle = EXPORTED_DATA ? EXPORTED_DATA.subtitle : "Language Focus: e.g., Present Perfect";
+    let gameSubtitle = EXPORTED_DATA ? EXPORTED_DATA.subtitle : "";
     let gameImage = EXPORTED_DATA ? EXPORTED_DATA.image : null;
     let rounds = EXPORTED_DATA ? EXPORTED_DATA.rounds : [
         {
-            question: "Dummy Question: Name a...",
-            answers: [
-                { text: "Dummy Answer 1", points: 40 },
-                { text: "Dummy Answer 2", points: 30 },
-                { text: "Dummy Answer 3", points: 15 },
-                { text: "Dummy Answer 4", points: 10 },
-                { text: "Dummy Answer 5", points: 5 },
-                { text: "", points: 0 },
-                { text: "", points: 0 },
-                { text: "", points: 0 }
-            ]
+            question: "",
+            answers: Array(8).fill().map(() => ({ text: "", points: "" }))
         }
     ];
     
@@ -383,7 +378,7 @@
     function awardPoints(tileIndex, teamIndex, points, e) {
         e.stopPropagation();
         if (state.boardState[tileIndex].awardedTo === null) {
-            state.scores[teamIndex] += points;
+            state.scores[teamIndex] += (parseFloat(points) || 0);
             state.boardState[tileIndex].awardedTo = teamIndex + 1;
             render();
         }
@@ -425,8 +420,8 @@
             const ansRows = div.querySelectorAll('.prep-answer-row');
             ansRows.forEach(row => {
                 const t = row.querySelector('.a-text').value;
-                const p = parseFloat(row.querySelector('.a-pts').value) || 0;
-                answers.push({text: t, points: p});
+                const pVal = row.querySelector('.a-pts').value;
+                answers.push({text: t, points: pVal !== '' ? parseFloat(pVal) : ''});
             });
             gatheredRounds.push({question: q, answers: answers});
         });
@@ -435,7 +430,7 @@
 
     function addRound() {
         syncSetupState();
-        rounds.push({ question: "New Question...", answers: Array(8).fill().map(() => ({ text: "", points: 0 })) });
+        rounds.push({ question: "", answers: Array(8).fill().map(() => ({ text: "", points: "" })) });
         render();
     }
 
@@ -450,14 +445,107 @@
         }
     }
 
+    function importBulkData() {
+        const text = document.getElementById('bulk-import-text').value;
+        if (!text.trim()) {
+            alert("Please paste some formatted text first.");
+            return;
+        }
+
+        const lines = text.split('\n');
+        let newRounds = [];
+        let currentRound = null;
+        
+        // Automated scoring system based on answer rank position
+        const defaultPoints = [10, 8, 6, 5, 4, 3, 2, 1];
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (!line) continue;
+
+            // Detect new round (e.g., "Round 1:", "Round 2", "Round 3 -")
+            const roundMatch = line.match(/^Round\s*\d+[\:\-\.;]?\s*(.*)$/i);
+            if (roundMatch) {
+                currentRound = {
+                    question: roundMatch[1].trim(),
+                    answers: Array(8).fill().map(() => ({ text: "", points: "" }))
+                };
+                newRounds.push(currentRound);
+                continue;
+            }
+
+            // Detect numbered answer (e.g., "1. Response", "2) Response")
+            const ansMatch = line.match(/^(\d+)[\.\)\-\:]\s*(.*)$/);
+            if (ansMatch && currentRound) {
+                const index = parseInt(ansMatch[1]) - 1;
+                if (index >= 0 && index < 8) {
+                    currentRound.answers[index].text = ansMatch[2].trim();
+                    currentRound.answers[index].points = defaultPoints[index]; // Assign specific points based on position
+                }
+            } else if (currentRound && !currentRound.question && !ansMatch) {
+                // If the question text dropped to the line immediately below the "Round" declaration
+                currentRound.question = line;
+            }
+        }
+
+        if (newRounds.length > 0) {
+            if(confirm("This will replace your currently setup rounds with the imported data. Do you wish to proceed?")) {
+                syncSetupState(); // Keep titles and teams
+                rounds = newRounds;
+                state.currentRound = 0;
+                render();
+            }
+        } else {
+            alert("Could not detect any valid rounds. Please ensure you format your text starting with 'Round 1:', followed by '1.', '2.', etc.");
+        }
+    }
+
+    function downloadHostReference() {
+        syncSetupState();
+        let docContent = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'><title>Host Reference Sheet</title></head><body style="font-family: Arial, sans-serif;">
+        <h1 style="text-align:center;">${gameTitle || 'Our Survey Said...'} - Host Reference</h1>
+        <h3 style="text-align:center;">${gameSubtitle || ''}</h3>
+        <hr>`;
+        
+        rounds.forEach((r, i) => {
+            docContent += `<h2>Round ${i + 1}: ${r.question || '[Unspecified Question]'}</h2>`;
+            docContent += `<table border="1" cellspacing="0" cellpadding="5" style="border-collapse: collapse; width: 100%; max-width: 600px;">`;
+            docContent += `<tr style="background-color: #f2f2f2;"><th style="text-align:left;">Rank</th><th style="text-align:left;">Answer</th><th style="text-align:right;">Points</th></tr>`;
+            
+            let hasAnswers = false;
+            r.answers.forEach((ans, j) => {
+                if (ans.text && ans.text.trim() !== "") {
+                    hasAnswers = true;
+                    docContent += `<tr><td>${j + 1}</td><td>${ans.text}</td><td style="text-align:right;">${ans.points !== '' ? ans.points : 0}</td></tr>`;
+                }
+            });
+            if (!hasAnswers) {
+                docContent += `<tr><td colspan="3"><em>No answers entered yet.</em></td></tr>`;
+            }
+            docContent += `</table><br/>`;
+        });
+        
+        docContent += `</body></html>`;
+        
+        const blob = new Blob(['\ufeff', docContent], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safeTitle = (gameTitle || 'host_reference').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.download = safeTitle + "_host_reference.doc";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
     function exportGame() {
         syncSetupState();
         const dataObj = { title: gameTitle, subtitle: gameSubtitle, image: gameImage, rounds: rounds, teamNames: state.teamNames };
         
-        // Escape brackets safely for script tags to prevent XSS/Parser breaks
         const dataStr = JSON.stringify(dataObj).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
         
-        // Clean clone of the entire document to strip transient states
         const clone = document.documentElement.cloneNode(true);
         
         const appCont = clone.querySelector('#app-container');
@@ -472,7 +560,6 @@
         const sOverlay = clone.querySelector('#strikeOverlay');
         if (sOverlay) sOverlay.classList.remove('strike-active');
         
-        // Vigorously strip out empty text nodes in the body to eliminate rogue characters (\n\n)
         const body = clone.querySelector('body');
         if (body) {
             Array.from(body.childNodes).forEach(node => {
@@ -482,19 +569,16 @@
             });
         }
         
-        // Inject the stringified data explicitly into a data island to prevent JS syntax crash
         const dataScript = clone.querySelector('#game-data');
         if (dataScript) {
             dataScript.textContent = dataStr;
         }
         
-        // Flip the launch flag natively
         const mainScript = clone.querySelector('#main-script');
         if (mainScript) {
             mainScript.textContent = mainScript.textContent.replace(/const IS_SETUP\s*=\s*(true|false);\s*\/\/\s*EXPORT_FLAG/, "const IS_SETUP = false; // EXPORT_FLAG");
         }
         
-        // Rebuild clean HTML
         let htmlContent = "<!DOCTYPE html>\n" + clone.outerHTML;
         
         const blob = new Blob([htmlContent], {type: "text/html;charset=utf-8"});
@@ -545,7 +629,7 @@
                 <h2 style="color:var(--accent-gold); text-align:center; font-size:2em; margin-top:0;">Game Setup Dashboard</h2>
                 <div class="setup-header-fields">
                     <label>Main Title: <input type="text" id="setup-title" value="${gameTitle.replace(/"/g, '&quot;')}"></label>
-                    <label>Subheading: <input type="text" id="setup-subtitle" value="${gameSubtitle.replace(/"/g, '&quot;')}"></label>
+                    <label>Subheading: <input type="text" id="setup-subtitle" placeholder="Language Focus: e.g., Present Perfect" value="${gameSubtitle.replace(/"/g, '&quot;')}"></label>
                     <label style="margin-top: 10px;">Splash Screen Image: <input type="file" id="setup-image" accept="image/*" onchange="handleImageUpload(event)" style="border: none; background: transparent; padding: 5px 0;"></label>
                     <img id="image-preview" src="${gameImage || ''}" style="max-height: 150px; border-radius: 4px; display: ${gameImage ? 'block' : 'none'}; margin-top: 10px; border: 2px solid var(--accent-cyan);">
                     
@@ -555,6 +639,20 @@
                         </div>
                     </label>
                 </div>
+                
+                <div class="bulk-import-section" style="background: #001133; padding: 20px; border-radius: 8px; border: 1px solid var(--accent-cyan); margin-bottom: 30px;">
+                    <h3 style="color: var(--accent-gold); margin-top: 0; margin-bottom: 5px;">Bulk Paste Questions & Answers</h3>
+                    <p style="font-size: 0.95em; color: #ccc; margin-bottom: 15px; line-height: 1.4;">
+                        Paste your text below to automatically generate your rounds. Ensure your text follows this exact format:<br>
+                        <strong style="color: white;">Round 1: [Your Question Here]</strong><br>
+                        <strong style="color: white;">1. [First Answer]</strong><br>
+                        <strong style="color: white;">2. [Second Answer]</strong><br>
+                        <em>...continue up to 8 answers, then begin Round 2:</em>
+                    </p>
+                    <textarea id="bulk-import-text" rows="8" style="width: 100%; font-family: var(--font-main); font-size: 1em; padding: 10px; background: #000a20; color: white; border: 1px solid #555; border-radius: 4px;" placeholder="Round 1: Name a reason someone might be late for work&#10;1. Traffic&#10;2. Overslept&#10;3. Car wouldn't start"></textarea>
+                    <button class="btn-gold" style="margin-top: 10px; font-size: 1.1em; padding: 10px 20px;" onclick="importBulkData()">📥 Import Data</button>
+                </div>
+
                 <div id="setup-rounds-container">`;
         
         rounds.forEach((round, rIndex) => {
@@ -567,12 +665,13 @@
                     <input type="text" class="q-input" value="${round.question.replace(/"/g, '&quot;')}" placeholder="Enter question...">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">`;
             for(let i=0; i<8; i++){
-                let ans = round.answers[i] || { text: '', points: 0 };
+                let ans = round.answers[i] || { text: '', points: '' };
+                let ptsValue = ans.points !== '' ? ans.points : '';
                 html += `
                     <div class="prep-answer-row">
                         <span style="display:inline-block; width: 20px;">${i+1}.</span>
                         <input type="text" class="a-text" value="${ans.text.replace(/"/g, '&quot;')}" placeholder="Answer">
-                        <input type="number" class="a-pts" step="any" value="${ans.points}" placeholder="Pts">
+                        <input type="number" class="a-pts" step="any" value="${ptsValue}" placeholder="Pts">
                     </div>`;
             }
             html += `</div></div>`;
@@ -581,7 +680,10 @@
         html += `
                 </div>
                 <div style="display:flex; flex-direction:column; gap:20px; margin-top:30px;">
-                    <button class="btn-gold" style="font-size:1.2em; padding:10px;" onclick="addRound()">+ Add New Round</button>
+                    <div style="display:flex; gap: 20px;">
+                        <button class="btn-gold" style="flex:1; font-size:1.2em; padding:10px;" onclick="addRound()">+ Add New Round</button>
+                        <button class="btn-gold" style="flex:1; font-size:1.2em; padding:10px; border-color: #00ffff; color: #00ffff;" onclick="downloadHostReference()">📄 Print questions and responses for host reference</button>
+                    </div>
                     <div style="display:flex; gap: 20px;">
                         <button style="flex:1; background:#0033aa; border:2px solid var(--accent-gold); color:white; font-size:1.5em; padding:15px; text-transform:uppercase; cursor:pointer;" onclick="toggleSetup()">▶️ Play / Resume Game</button>
                         <button style="flex:1; background:#009900; border:2px solid #00ff00; color:white; font-size:1.5em; padding:15px; text-transform:uppercase; cursor:pointer;" onclick="exportGame()">⬇️ Download Game</button>
@@ -616,6 +718,7 @@
                         <li><strong>Win the Game:</strong> The team with the most points at the end wins!</li>
                     </ul>
                 </div>
+                <p style="font-size: 0.9em; color: #aaa; margin-top: 15px;"><em>Note to quiz hosts: before playing make a note of the answers (in set up/answers) so you can reveal them when guessed.</em></p>
                 <button class="btn-gold" style="font-size:2em; padding:15px 40px; margin-top:30px; text-transform:uppercase;" onclick="startGame()">Start Game</button>
             </div>`;
     }
@@ -668,7 +771,7 @@
                     <div class="tile">
                         <div class="tile-revealed">
                             <div class="tile-text">${ans.text}</div>
-                            <div class="tile-points">${ans.points}</div>
+                            <div class="tile-points">${ans.points !== '' ? ans.points : 0}</div>
                         </div>
                         ${awardBtns}
                         ${awardedTag}
