@@ -1,9 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Our Survey Said... - Template Builder</title>
+<title>Our Survey Said...</title>
 <style>
     :root {
         --bg-dark: #000a20;
@@ -152,9 +151,7 @@
 
 </style>
 </head>
-<body>
-
-<header id="main-header" style="display:none;">
+<body><header id="main-header" style="display:none;">
     <div>
         <h1 id="header-title" style="margin: 0; font-size: 1.5em; color: var(--accent-gold); text-shadow: 0 0 5px var(--accent-gold);"></h1>
     </div>
@@ -163,33 +160,19 @@
             <select id="teamCountSelect" onchange="changeTeamCount(this.value)">
                 <option value="1">1</option>
                 <option value="2">2</option>
-                <option value="3" selected>3</option>
+                <option value="3" selected="">3</option>
                 <option value="4">4</option>
             </select>
         </label>
     </div>
-</header>
-
-<div id="app-container"></div>
-
-<div class="footer-controls" style="position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; gap: 10px;">
-    <button id="setupToggleBtn" onclick="toggleSetup()" style="border-color: var(--accent-gold); color: var(--accent-gold); background: rgba(0,0,0,0.8);">⚙️ Setup / Answers</button>
+</header><div id="app-container"></div><div class="footer-controls" style="position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; gap: 10px;">
+    <button id="setupToggleBtn" onclick="toggleSetup()" style="border-color: var(--accent-gold); color: var(--accent-gold); background: rgba(0,0,0,0.8);">▶️ Return to Game</button>
     <button id="muteBtn" onclick="toggleMute()" style="border-color: #888; color: #ddd; background: rgba(0,0,0,0.7);">🔊 Mute</button>
     <button id="fsBtn" onclick="toggleFullScreen()" style="border-color: #888; color: #ddd; background: rgba(0,0,0,0.7);">⛶ Full Screen</button>
-</div>
-
-<div id="strikeOverlay" class="strike-overlay">X</div>
-
-<footer class="copyright">
+</div><div id="strikeOverlay" class="strike-overlay">X</div><footer class="copyright">
     © 2026 Martin Allen. All rights reserved. Free for classroom use; duplication or distribution of the source code is prohibited.
-</footer>
-
-<script id="game-data" type="application/json">
-{}
-</script>
-
-<script id="main-script">
-    const IS_SETUP = true; // EXPORT_FLAG
+</footer><script id="game-data" type="application/json">{"title":"Top Answer","subtitle":"","image":null,"rounds":[{"question":"","answers":[{"text":"","points":""},{"text":"","points":""},{"text":"","points":""},{"text":"","points":""},{"text":"","points":""},{"text":"","points":""},{"text":"","points":""},{"text":"","points":""}]}],"teamNames":["Team 1","Team 2","Team 3","Team 4"]}</script><script id="main-script">
+    const IS_SETUP = false; // EXPORT_FLAG
     let EXPORTED_DATA = null; 
 
     try {
@@ -798,6 +781,4 @@
     }
 
     render();
-</script>
-</body>
-</html>
+</script></body></html>
